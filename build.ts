@@ -2,7 +2,7 @@
 import { build, type BuildConfig } from "bun";
 import plugin from "bun-plugin-tailwind";
 import { existsSync } from "fs";
-import { rm } from "fs/promises";
+import { rm, cp } from "fs/promises";
 import path from "path";
 
 // Print help text if requested
@@ -165,5 +165,11 @@ const outputTable = result.outputs.map(output => ({
 
 console.table(outputTable);
 const buildTime = (end - start).toFixed(2);
+
+// Copy GLB files to dist directory
+if (existsSync("src/fish.glb")) {
+  await cp("src/fish.glb", path.join(outdir, "fish.glb"));
+  console.log("📦 Copied fish.glb to dist directory");
+}
 
 console.log(`\n✅ Build completed in ${buildTime}ms\n`);
