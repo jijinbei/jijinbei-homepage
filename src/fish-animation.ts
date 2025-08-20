@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { Fish } from "./types";
 import fishModelUrl from "./fish.glb";
+import { WebGPUParticleSystem } from "./webgpu-particle-system";
 
 export const loadFishModel = async (): Promise<THREE.Group | null> => {
   const loader = new GLTFLoader();
@@ -19,19 +20,30 @@ export const loadFishModel = async (): Promise<THREE.Group | null> => {
 export const initializeFish = (fishModel: THREE.Group, scene: THREE.Scene): Fish[] => {
   if (!fishModel) return [];
 
-  return Array.from({ length: 32 }, (_, i) => {
+  return Array.from({ length: 16 }, (_, i) => {
     const fishClone = fishModel.clone();
+    
+    // 3つの小さなクラスターに分散
+    const clusterId = Math.floor(i / 6); // 0, 1, 2
+    const clusterCenters = [
+      { x: -150, y: -100, z: 0 },   // 左下クラスター
+      { x: 100, y: 50, z: 20 },     // 右上クラスター  
+      { x: 0, y: -150, z: -30 }     // 中央下クラスター
+    ];
+    
+    const center = clusterCenters[clusterId] || clusterCenters[0];
+    
     const fish: Fish = {
       id: i,
       position: new THREE.Vector3(
-        (Math.random() - 0.5) * 400,
-        (Math.random() - 0.5) * 400,
-        Math.random() * 100 - 50
+        center.x + (Math.random() - 0.5) * 120,
+        center.y + (Math.random() - 0.5) * 120,
+        center.z + (Math.random() - 0.5) * 40
       ),
       velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 4,
-        (Math.random() - 0.5) * 4,
-        (Math.random() - 0.5) * 1
+        (Math.random() - 0.5) * 2 + (clusterId * 0.5 - 0.5), // クラスター別の傾向
+        (Math.random() - 0.5) * 2 + (Math.sin(clusterId) * 0.5),
+        (Math.random() - 0.5) * 0.5
       ),
       mesh: fishClone,
       color: new THREE.Color().setHSL(Math.random(), 0.7, 0.6),
@@ -53,10 +65,15 @@ export const applyBoidRules = (
   const cohesion = new THREE.Vector3();
   const mouseAttraction = new THREE.Vector3();
 
-  const separationRadius = 50;
-  const alignmentRadius = 80;
-  const cohesionRadius = 120;
-  const mouseAttractionRadius = 200;
+  const separationRadius = 30;  // より近くで分離
+  const alignmentRadius = 60;   // 中距離で方向を合わせる
+  const cohesionRadius = 80;    // やや遠くで集まる
+  const mouseAttractionRadius = 150;
+  
+  // 距離の二乗で比較（平方根計算を避ける）
+  const separationRadiusSq = separationRadius * separationRadius;
+  const alignmentRadiusSq = alignmentRadius * alignmentRadius;
+  const cohesionRadiusSq = cohesionRadius * cohesionRadius;
 
   let separationCount = 0;
   let alignmentCount = 0;
@@ -65,21 +82,22 @@ export const applyBoidRules = (
   neighbors.forEach((neighbor) => {
     if (neighbor.id === fish.id) return;
 
-    const distance = fish.position.distanceTo(neighbor.position);
     const diff = new THREE.Vector3().subVectors(fish.position, neighbor.position);
+    const distanceSquared = diff.lengthSq(); // 平方根計算を避ける
 
-    if (distance < separationRadius && distance > 0) {
+    if (distanceSquared < separationRadiusSq && distanceSquared > 0) {
+      const distance = Math.sqrt(distanceSquared);
       diff.normalize().divideScalar(distance);
       separation.add(diff);
       separationCount++;
     }
 
-    if (distance < alignmentRadius) {
+    if (distanceSquared < alignmentRadiusSq) {
       alignment.add(neighbor.velocity);
       alignmentCount++;
     }
 
-    if (distance < cohesionRadius) {
+    if (distanceSquared < cohesionRadiusSq) {
       cohesion.add(neighbor.position);
       cohesionCount++;
     }
@@ -100,11 +118,11 @@ export const applyBoidRules = (
   }
 
   if (separationCount > 0) {
-    separation.divideScalar(separationCount).normalize().multiplyScalar(0.5);
+    separation.divideScalar(separationCount).normalize().multiplyScalar(1.2);  // 分離をさらに強化
   }
 
   if (alignmentCount > 0) {
-    alignment.divideScalar(alignmentCount).normalize().multiplyScalar(0.1);
+    alignment.divideScalar(alignmentCount).normalize().multiplyScalar(0.15);   // 整列を弱める
   }
 
   if (cohesionCount > 0) {
@@ -112,7 +130,7 @@ export const applyBoidRules = (
       .divideScalar(cohesionCount)
       .sub(fish.position)
       .normalize()
-      .multiplyScalar(0.05);
+      .multiplyScalar(0.03);  // 結束を弱める
   }
 
   return new THREE.Vector3()
@@ -122,7 +140,11 @@ export const applyBoidRules = (
     .add(mouseAttraction);
 };
 
-export const updateFishAnimation = (fishes: Fish[], mousePosition: { x: number; y: number }): void => {
+export const updateFishAnimation = (
+  fishes: Fish[], 
+  mousePosition: { x: number; y: number }, 
+  particleSystem: WebGPUParticleSystem
+): void => {
   fishes.forEach((fish) => {
     if (!fish.mesh) return;
 
@@ -130,26 +152,41 @@ export const updateFishAnimation = (fishes: Fish[], mousePosition: { x: number; 
 
     fish.velocity.add(boidForce);
 
-    // ランダムな動きを追加
+    // ランダムな動きを追加（群れを分散させるため）
     fish.velocity.add(
       new THREE.Vector3(
-        (Math.random() - 0.5) * 0.01,
-        (Math.random() - 0.5) * 0.01,
-        (Math.random() - 0.5) * 0.005
+        (Math.random() - 0.5) * 0.015,
+        (Math.random() - 0.5) * 0.015,
+        (Math.random() - 0.5) * 0.008
       )
     );
 
     // 速度制限
     const maxSpeed = 5;
+    const minSpeed = 0.8;
+    
     if (fish.velocity.length() > maxSpeed) {
       fish.velocity.normalize().multiplyScalar(maxSpeed);
+    } else if (fish.velocity.length() < minSpeed) {
+      // 最低速度を保つ
+      fish.velocity.normalize().multiplyScalar(minSpeed);
     }
 
     // 減衰
     fish.velocity.multiplyScalar(0.98);
 
     // 位置更新
+    const oldPosition = fish.position.clone();
     fish.position.add(fish.velocity);
+
+    // パーティクル生成（確率的に）
+    if (Math.random() < 0.4 && fish.velocity.length() > 1.0) {
+      particleSystem.spawnParticlesFromFish(
+        oldPosition,
+        fish.velocity,
+        fish.color
+      );
+    }
 
     // 境界処理
     const halfWidth = window.innerWidth / 2;

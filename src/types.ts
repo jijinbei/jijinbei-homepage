@@ -15,3 +15,14 @@ export interface Star {
   baseOpacity: number;
   twinklePhase: number;
 }
+
+export interface Particle {
+  id: number;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: THREE.Color;
+  mesh: THREE.Mesh | null;
+}

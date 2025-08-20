@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
-import { Fish, Star } from "../types";
+import { Fish, Star, Particle } from "../types";
 import { initializeStars, drawStars } from "../star-animation";
 import { loadFishModel, initializeFish, updateFishAnimation } from "../fish-animation";
 import { initializeRenderer, setupScene } from "../renderer-setup";
+import { WebGPUParticleSystem } from "../webgpu-particle-system";
 
 const ThreeFishScene = () => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -16,12 +17,24 @@ const ThreeFishScene = () => {
   const fishModelRef = useRef<THREE.Group | undefined>(undefined);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const starsRef = useRef<Star[]>([]);
+  const particleSystemRef = useRef<WebGPUParticleSystem | undefined>(undefined);
 
   const animate = useCallback(() => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
 
     drawStars(canvasRef.current, starsRef.current);
-    updateFishAnimation(fishesRef.current, mouseRef.current);
+    
+    if (particleSystemRef.current) {
+      updateFishAnimation(
+        fishesRef.current, 
+        mouseRef.current, 
+        particleSystemRef.current
+      );
+    }
+
+    if (particleSystemRef.current) {
+      particleSystemRef.current.update();
+    }
 
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     animationRef.current = requestAnimationFrame(animate);
@@ -54,6 +67,10 @@ const ThreeFishScene = () => {
 
     // 星とモデルの初期化
     starsRef.current = initializeStars();
+    
+    // WebGPUパーティクルシステムの初期化
+    particleSystemRef.current = new WebGPUParticleSystem(renderer);
+    particleSystemRef.current.initialize(scene);
     
     const fishModel = await loadFishModel();
     if (fishModel) {
@@ -118,6 +135,10 @@ const ThreeFishScene = () => {
         mountRef.current.removeChild(canvasRef.current);
       }
 
+      if (particleSystemRef.current) {
+        particleSystemRef.current.dispose();
+      }
+      
       rendererRef.current?.dispose();
     };
   }, [initializeComponents, setupEventListeners]);
