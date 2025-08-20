@@ -29,9 +29,9 @@ export const initializeFish = (fishModel: THREE.Group, scene: THREE.Scene): Fish
         Math.random() * 100 - 50
       ),
       velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 0.5
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 1
       ),
       mesh: fishClone,
       color: new THREE.Color().setHSL(Math.random(), 0.7, 0.6),
@@ -140,13 +140,13 @@ export const updateFishAnimation = (fishes: Fish[], mousePosition: { x: number; 
     );
 
     // 速度制限
-    const maxSpeed = 3;
+    const maxSpeed = 5;
     if (fish.velocity.length() > maxSpeed) {
       fish.velocity.normalize().multiplyScalar(maxSpeed);
     }
 
     // 減衰
-    fish.velocity.multiplyScalar(0.99);
+    fish.velocity.multiplyScalar(0.98);
 
     // 位置更新
     fish.position.add(fish.velocity);
