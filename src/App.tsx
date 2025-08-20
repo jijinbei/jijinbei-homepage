@@ -1,40 +1,356 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import fishModelUrl from "./fish.glb";
 
-const Fish = ({ delay = 0 }: { delay?: number }) => (
-  <div
-    className="absolute text-2xl opacity-70 animate-pulse fish-swim"
-    style={{
-      animationDelay: `${delay}s`,
-      left: "-50px",
-      top: `${20 + Math.random() * 60}%`,
-    }}
-  >
-    🐠
-  </div>
-);
+interface Fish {
+  id: number;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  mesh: THREE.Group | null;
+  color: THREE.Color;
+}
+
+interface Star {
+  x: number;
+  y: number;
+  opacity: number;
+  baseOpacity: number;
+  twinklePhase: number;
+}
+
+const ThreeFishScene = () => {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | undefined>(undefined);
+  const rendererRef = useRef<THREE.WebGLRenderer | undefined>(undefined);
+  const cameraRef = useRef<THREE.OrthographicCamera | undefined>(undefined);
+  const animationRef = useRef<number | undefined>(undefined);
+  const mouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const fishesRef = useRef<Fish[]>([]);
+  const fishModelRef = useRef<THREE.Group | undefined>(undefined);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const starsRef = useRef<Star[]>([]);
+
+  const initializeStars = useCallback(() => {
+    starsRef.current = Array.from({ length: 80 }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      opacity: 0.2 + Math.random() * 0.3,
+      baseOpacity: 0.2 + Math.random() * 0.3,
+      twinklePhase: Math.random() * Math.PI * 2,
+    }));
+  }, []);
+
+  const drawStars = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    starsRef.current.forEach((star) => {
+      star.twinklePhase += 0.02;
+      star.opacity = star.baseOpacity + Math.sin(star.twinklePhase) * 0.1;
+      ctx.globalAlpha = star.opacity;
+      ctx.fillStyle = "white";
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, 1, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }, []);
+
+  const loadFishModel = useCallback(async () => {
+    const loader = new GLTFLoader();
+    try {
+      const gltf = await loader.loadAsync(fishModelUrl);
+      fishModelRef.current = gltf.scene;
+
+      fishModelRef.current.scale.set(100, 100, 100);
+
+      initializeFish();
+    } catch (error) {
+      console.error("Error loading fish model:", error);
+    }
+  }, []);
+
+  const initializeFish = useCallback(() => {
+    if (!fishModelRef.current || !sceneRef.current) return;
+
+    fishesRef.current = Array.from({ length: 32 }, (_, i) => {
+      const fishClone = fishModelRef.current!.clone();
+      const fish: Fish = {
+        id: i,
+        position: new THREE.Vector3(
+          (Math.random() - 0.5) * 400,
+          (Math.random() - 0.5) * 400,
+          Math.random() * 100 - 50
+        ),
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 0.5
+        ),
+        mesh: fishClone,
+        color: new THREE.Color().setHSL(Math.random(), 0.7, 0.6),
+      };
+
+      fishClone.position.copy(fish.position);
+
+      sceneRef.current!.add(fishClone);
+      return fish;
+    });
+  }, []);
+
+  const applyBoidRules = useCallback((fish: Fish, neighbors: Fish[]) => {
+    const separation = new THREE.Vector3();
+    const alignment = new THREE.Vector3();
+    const cohesion = new THREE.Vector3();
+    const mouseAttraction = new THREE.Vector3();
+
+    const separationRadius = 50;
+    const alignmentRadius = 80;
+    const cohesionRadius = 120;
+    const mouseAttractionRadius = 200;
+
+    let separationCount = 0;
+    let alignmentCount = 0;
+    let cohesionCount = 0;
+
+    neighbors.forEach((neighbor) => {
+      if (neighbor.id === fish.id) return;
+
+      const distance = fish.position.distanceTo(neighbor.position);
+      const diff = new THREE.Vector3().subVectors(
+        fish.position,
+        neighbor.position
+      );
+
+      if (distance < separationRadius && distance > 0) {
+        diff.normalize().divideScalar(distance);
+        separation.add(diff);
+        separationCount++;
+      }
+
+      if (distance < alignmentRadius) {
+        alignment.add(neighbor.velocity);
+        alignmentCount++;
+      }
+
+      if (distance < cohesionRadius) {
+        cohesion.add(neighbor.position);
+        cohesionCount++;
+      }
+    });
+
+    const mousePos = new THREE.Vector3(
+      mouseRef.current.x - window.innerWidth / 2,
+      -(mouseRef.current.y - window.innerHeight / 2),
+      0
+    );
+    const mouseDistance = fish.position.distanceTo(mousePos);
+
+    if (mouseDistance < mouseAttractionRadius && mouseDistance > 0) {
+      mouseAttraction
+        .subVectors(mousePos, fish.position)
+        .normalize()
+        .multiplyScalar(0.3);
+    }
+
+    if (separationCount > 0) {
+      separation.divideScalar(separationCount).normalize().multiplyScalar(0.5);
+    }
+
+    if (alignmentCount > 0) {
+      alignment.divideScalar(alignmentCount).normalize().multiplyScalar(0.1);
+    }
+
+    if (cohesionCount > 0) {
+      cohesion
+        .divideScalar(cohesionCount)
+        .sub(fish.position)
+        .normalize()
+        .multiplyScalar(0.05);
+    }
+
+    return new THREE.Vector3()
+      .add(separation)
+      .add(alignment)
+      .add(cohesion)
+      .add(mouseAttraction);
+  }, []);
+
+  const animate = useCallback(() => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+
+    drawStars();
+
+    fishesRef.current.forEach((fish) => {
+      if (!fish.mesh) return;
+
+      const boidForce = applyBoidRules(fish, fishesRef.current);
+
+      fish.velocity.add(boidForce);
+
+      fish.velocity.add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * 0.01,
+          (Math.random() - 0.5) * 0.01,
+          (Math.random() - 0.5) * 0.005
+        )
+      );
+
+      const maxSpeed = 3;
+      if (fish.velocity.length() > maxSpeed) {
+        fish.velocity.normalize().multiplyScalar(maxSpeed);
+      }
+
+      fish.velocity.multiplyScalar(0.99);
+
+      fish.position.add(fish.velocity);
+
+      const halfWidth = window.innerWidth / 2;
+      const halfHeight = window.innerHeight / 2;
+
+      if (fish.position.x < -halfWidth || fish.position.x > halfWidth) {
+        fish.velocity.x *= -0.8;
+        fish.position.x = Math.max(
+          -halfWidth,
+          Math.min(halfWidth, fish.position.x)
+        );
+      }
+      if (fish.position.y < -halfHeight || fish.position.y > halfHeight) {
+        fish.velocity.y *= -0.8;
+        fish.position.y = Math.max(
+          -halfHeight,
+          Math.min(halfHeight, fish.position.y)
+        );
+      }
+      if (fish.position.z < -100 || fish.position.z > 100) {
+        fish.velocity.z *= -0.8;
+        fish.position.z = Math.max(-100, Math.min(100, fish.position.z));
+      }
+
+      fish.mesh.position.copy(fish.position);
+
+      if (fish.velocity.length() > 0.01) {
+        const direction = fish.velocity.clone().normalize();
+        const targetPos = fish.position.clone().add(direction);
+        fish.mesh.lookAt(targetPos);
+        fish.mesh.rotateY(-Math.PI / 2);
+      }
+    });
+
+    rendererRef.current.render(sceneRef.current, cameraRef.current);
+    animationRef.current = requestAnimationFrame(animate);
+  }, [drawStars, applyBoidRules]);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(
+      window.innerWidth / -2,
+      window.innerWidth / 2,
+      window.innerHeight / 2,
+      window.innerHeight / -2,
+      -200,
+      1000
+    );
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    mountRef.current.appendChild(renderer.domElement);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.style.position = "absolute";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    canvas.style.pointerEvents = "none";
+    canvas.style.zIndex = "0";
+    mountRef.current.appendChild(canvas);
+    canvasRef.current = canvas;
+
+    camera.position.z = 100;
+
+    // 照明を追加
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+
+    sceneRef.current = scene;
+    cameraRef.current = camera;
+    rendererRef.current = renderer;
+
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.left = width / -2;
+      camera.right = width / 2;
+      camera.top = height / 2;
+      camera.bottom = height / -2;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+
+      if (canvasRef.current) {
+        canvasRef.current.width = width;
+        canvasRef.current.height = height;
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    window.addEventListener("resize", handleResize);
+    document.addEventListener("mousemove", handleMouseMove);
+
+    initializeStars();
+    loadFishModel();
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("mousemove", handleMouseMove);
+
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+
+      if (mountRef.current && renderer.domElement) {
+        mountRef.current.removeChild(renderer.domElement);
+      }
+      if (mountRef.current && canvasRef.current) {
+        mountRef.current.removeChild(canvasRef.current);
+      }
+
+      renderer.dispose();
+    };
+  }, [animate, loadFishModel, initializeStars]);
+
+  return (
+    <div
+      ref={mountRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: 1 }}
+    />
+  );
+};
 
 function App() {
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Background stars */}
-      <div className="absolute inset-0">
-        {[...Array(50)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full star"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 2}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Swimming fish */}
-      {[...Array(5)].map((_, i) => (
-        <Fish key={i} delay={i * 2} />
-      ))}
+      <ThreeFishScene />
 
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
