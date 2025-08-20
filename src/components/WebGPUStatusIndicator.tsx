@@ -2,14 +2,14 @@ import React, { useState, useEffect } from "react";
 import { checkWebGPUSupport } from "../webgpu-utils";
 
 const WebGPUStatusIndicator = () => {
-  const [webgpuStatus, setWebgpuStatus] = useState<string>('Checking...');
+  const [webgpuStatus, setWebgpuStatus] = useState<string>("Checking...");
 
   useEffect(() => {
-    checkWebGPUSupport().then(support => {
+    checkWebGPUSupport().then((support) => {
       if (support.supported) {
-        setWebgpuStatus('🚀 WebGPU Active');
+        setWebgpuStatus("🚀 WebGPU Active");
       } else {
-        setWebgpuStatus('⚙️ WebGL Fallback');
+        setWebgpuStatus("⚙️ WebGL Fallback");
       }
     });
   }, []);

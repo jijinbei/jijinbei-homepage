@@ -9,7 +9,7 @@ export async function checkWebGPUSupport(): Promise<WebGPUSupport> {
   if (!navigator.gpu) {
     return {
       supported: false,
-      reason: 'WebGPU not available in this browser'
+      reason: "WebGPU not available in this browser",
     };
   }
 
@@ -18,7 +18,7 @@ export async function checkWebGPUSupport(): Promise<WebGPUSupport> {
     if (!adapter) {
       return {
         supported: false,
-        reason: 'No suitable GPU adapter found'
+        reason: "No suitable GPU adapter found",
       };
     }
 
@@ -26,24 +26,24 @@ export async function checkWebGPUSupport(): Promise<WebGPUSupport> {
     return {
       supported: true,
       adapter,
-      device
+      device,
     };
   } catch (error) {
     return {
       supported: false,
-      reason: `WebGPU initialization failed: ${error}`
+      reason: `WebGPU initialization failed: ${error}`,
     };
   }
 }
 
 export function logWebGPUCapabilities(adapter: GPUAdapter, device: GPUDevice) {
-  console.log('WebGPU Adapter Info:', {
+  console.log("WebGPU Adapter Info:", {
     vendor: adapter.info?.vendor,
     architecture: adapter.info?.architecture,
     device: adapter.info?.device,
-    description: adapter.info?.description
+    description: adapter.info?.description,
   });
 
-  console.log('WebGPU Device Limits:', device.limits);
-  console.log('WebGPU Device Features:', Array.from(device.features));
+  console.log("WebGPU Device Limits:", device.limits);
+  console.log("WebGPU Device Features:", Array.from(device.features));
 }

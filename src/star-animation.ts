@@ -10,7 +10,10 @@ export const initializeStars = (): Star[] => {
   }));
 };
 
-export const drawStars = (canvas: HTMLCanvasElement | null, stars: Star[]): void => {
+export const drawStars = (
+  canvas: HTMLCanvasElement | null,
+  stars: Star[],
+): void => {
   if (!canvas) return;
 
   const ctx = canvas.getContext("2d");

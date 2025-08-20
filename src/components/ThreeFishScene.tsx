@@ -2,7 +2,11 @@ import React, { useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import { Fish, Star, Particle } from "../types";
 import { initializeStars, drawStars } from "../star-animation";
-import { loadFishModel, initializeFish, updateFishAnimation } from "../fish-animation";
+import {
+  loadFishModel,
+  initializeFish,
+  updateFishAnimation,
+} from "../fish-animation";
 import { initializeRenderer, setupScene } from "../renderer-setup";
 import { WebGPUParticleSystem } from "../webgpu-particle-system";
 
@@ -23,12 +27,12 @@ const ThreeFishScene = () => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
 
     drawStars(canvasRef.current, starsRef.current);
-    
+
     if (particleSystemRef.current) {
       updateFishAnimation(
-        fishesRef.current, 
-        mouseRef.current, 
-        particleSystemRef.current
+        fishesRef.current,
+        mouseRef.current,
+        particleSystemRef.current,
       );
     }
 
@@ -67,11 +71,11 @@ const ThreeFishScene = () => {
 
     // 星とモデルの初期化
     starsRef.current = initializeStars();
-    
+
     // WebGPUパーティクルシステムの初期化
     particleSystemRef.current = new WebGPUParticleSystem(renderer);
     particleSystemRef.current.initialize(scene);
-    
+
     const fishModel = await loadFishModel();
     if (fishModel) {
       fishModelRef.current = fishModel;
@@ -138,7 +142,7 @@ const ThreeFishScene = () => {
       if (particleSystemRef.current) {
         particleSystemRef.current.dispose();
       }
-      
+
       rendererRef.current?.dispose();
     };
   }, [initializeComponents, setupEventListeners]);

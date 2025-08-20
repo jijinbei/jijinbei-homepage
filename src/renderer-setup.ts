@@ -2,27 +2,32 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { checkWebGPUSupport, logWebGPUCapabilities } from "./webgpu-utils";
 
-export const initializeRenderer = async (): Promise<THREE.WebGLRenderer | any> => {
+export const initializeRenderer = async (): Promise<
+  THREE.WebGLRenderer | any
+> => {
   const webgpuSupport = await checkWebGPUSupport();
   let renderer: any;
 
   if (webgpuSupport.supported && webgpuSupport.device) {
-    console.log('🚀 WebGPU is supported! Using WebGPU renderer');
+    console.log("🚀 WebGPU is supported! Using WebGPU renderer");
     logWebGPUCapabilities(webgpuSupport.adapter!, webgpuSupport.device);
-    
-    renderer = new WebGPURenderer({ 
+
+    renderer = new WebGPURenderer({
       antialias: true,
-      alpha: true 
+      alpha: true,
     });
-    
+
     await renderer.init();
   } else {
-    console.log('⚠️ WebGPU not supported, falling back to WebGL:', webgpuSupport.reason);
+    console.log(
+      "⚠️ WebGPU not supported, falling back to WebGL:",
+      webgpuSupport.reason,
+    );
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   }
 
   renderer.setSize(window.innerWidth, window.innerHeight);
-  
+
   if (renderer instanceof THREE.WebGLRenderer) {
     renderer.setClearColor(0x000000, 0);
   } else {
@@ -32,8 +37,8 @@ export const initializeRenderer = async (): Promise<THREE.WebGLRenderer | any> =
   return renderer;
 };
 
-export const setupScene = (): { 
-  scene: THREE.Scene; 
+export const setupScene = (): {
+  scene: THREE.Scene;
   camera: THREE.OrthographicCamera;
 } => {
   const scene = new THREE.Scene();
@@ -43,7 +48,7 @@ export const setupScene = (): {
     window.innerHeight / 2,
     window.innerHeight / -2,
     -200,
-    1000
+    1000,
   );
 
   camera.position.z = 100;

@@ -22,11 +22,11 @@ export const createParticle = (
   color: THREE.Color,
   scene: THREE.Scene,
   geometry: THREE.BufferGeometry,
-  material: THREE.MeshBasicMaterial
+  material: THREE.MeshBasicMaterial,
 ): Particle => {
   const particleMaterial = material.clone();
   particleMaterial.color = color.clone();
-  
+
   const mesh = new THREE.Mesh(geometry, particleMaterial);
   mesh.position.copy(position);
   scene.add(mesh);
@@ -39,7 +39,7 @@ export const createParticle = (
     maxLife: 1.0,
     size: Math.random() * 1.5 + 1.0,
     color: color.clone(),
-    mesh
+    mesh,
   };
 };
 
@@ -50,7 +50,7 @@ export const spawnParticlesFromFish = (
   scene: THREE.Scene,
   geometry: THREE.BufferGeometry,
   material: THREE.MeshBasicMaterial,
-  particles: Particle[]
+  particles: Particle[],
 ): void => {
   // 魚の速度が十分にある場合のみパーティクルを生成
   if (fishVelocity.length() < 0.5) return;
@@ -59,21 +59,26 @@ export const spawnParticlesFromFish = (
 
   for (let i = 0; i < particleCount; i++) {
     // 魚の後ろの位置を計算
-    const backwardDirection = fishVelocity.clone().normalize().multiplyScalar(-10);
+    const backwardDirection = fishVelocity
+      .clone()
+      .normalize()
+      .multiplyScalar(-10);
     const particlePosition = fishPosition.clone().add(backwardDirection);
-    
+
     // ランダムな散らばりを追加
-    particlePosition.add(new THREE.Vector3(
-      (Math.random() - 0.5) * 8,
-      (Math.random() - 0.5) * 8,
-      (Math.random() - 0.5) * 4
-    ));
+    particlePosition.add(
+      new THREE.Vector3(
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 4,
+      ),
+    );
 
     // パーティクルの初期速度（魚の速度の逆方向 + ランダム）
     const particleVelocity = new THREE.Vector3(
       fishVelocity.x * -0.3 + (Math.random() - 0.5) * 0.5,
       fishVelocity.y * -0.3 + (Math.random() - 0.5) * 0.5,
-      fishVelocity.z * -0.3 + (Math.random() - 0.5) * 0.2
+      fishVelocity.z * -0.3 + (Math.random() - 0.5) * 0.2,
     );
 
     // 色に少しバリエーションを追加（明るくする）
@@ -86,21 +91,23 @@ export const spawnParticlesFromFish = (
       particleColor,
       scene,
       geometry,
-      material
+      material,
     );
 
     particles.push(particle);
   }
-  
 };
 
-export const updateParticles = (particles: Particle[], scene: THREE.Scene): void => {
+export const updateParticles = (
+  particles: Particle[],
+  scene: THREE.Scene,
+): void => {
   for (let i = particles.length - 1; i >= 0; i--) {
     const particle = particles[i];
-    
+
     // 寿命を減らす（より早く消える）
     particle.life -= 0.03;
-    
+
     if (particle.life <= 0) {
       // パーティクルを削除
       if (particle.mesh) {
@@ -115,22 +122,22 @@ export const updateParticles = (particles: Particle[], scene: THREE.Scene): void
 
     // 位置を更新
     particle.position.add(particle.velocity);
-    
+
     // 速度に減衰を適用
     particle.velocity.multiplyScalar(0.95);
-    
+
     // 重力効果を追加
     particle.velocity.y -= 0.01;
 
     // メッシュの位置とスケールを更新
     if (particle.mesh) {
       particle.mesh.position.copy(particle.position);
-      
+
       // 寿命に基づいてサイズと透明度を調整
       const lifeRatio = particle.life / particle.maxLife;
       const scale = particle.size * lifeRatio;
       particle.mesh.scale.set(scale, scale, scale);
-      
+
       if (particle.mesh.material instanceof THREE.MeshBasicMaterial) {
         particle.mesh.material.opacity = 0.9 * lifeRatio;
       }
