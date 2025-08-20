@@ -124,7 +124,7 @@ export const updateParticles = (
     particle.position.add(particle.velocity);
 
     // 速度に減衰を適用
-    particle.velocity.multiplyScalar(0.95);
+    particle.velocity.multiplyScalar(0.97);
 
     // 重力効果を追加
     particle.velocity.y -= 0.01;

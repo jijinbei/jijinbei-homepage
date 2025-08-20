@@ -174,9 +174,9 @@ export class WebGPUParticleSystem {
           this.particleData.velocity[i * 3 + 2];
 
         // 速度に減衰を適用
-        this.particleData.velocity[i * 3] *= 0.96;
-        this.particleData.velocity[i * 3 + 1] *= 0.96;
-        this.particleData.velocity[i * 3 + 2] *= 0.96;
+        this.particleData.velocity[i * 3] *= 0.98;
+        this.particleData.velocity[i * 3 + 1] *= 0.98;
+        this.particleData.velocity[i * 3 + 2] *= 0.98;
 
         // 重力（金砂が落ちる感じ）
         this.particleData.velocity[i * 3 + 1] -= 0.04;

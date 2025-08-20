@@ -179,7 +179,7 @@ export const updateFishAnimation = (
     }
 
     // 減衰
-    fish.velocity.multiplyScalar(0.98);
+    fish.velocity.multiplyScalar(0.999);
 
     // 位置更新
     const oldPosition = fish.position.clone();
